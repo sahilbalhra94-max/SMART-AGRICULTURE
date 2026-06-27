@@ -1,0 +1,348 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  phone         String?   @unique
+  password      String?
+  language      String    @default("en")
+  state         String?
+  district      String?
+  village       String?
+  profileImage  String?
+  role          String    @default("FARMER")
+  isVerified    Boolean   @default(false)
+  isActive      Boolean   @default(true)
+  provider      String    @default("LOCAL")
+  providerId    String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  refreshTokens RefreshToken[]
+  farms         Farm[]
+  conversations Conversation[]
+  notifications Notification[]
+  files         File[]
+  sensors       Sensor[]
+  diseaseReports DiseaseReport[]
+  analytics     FarmAnalytics[]
+  irrigationSchedules IrrigationSchedule[]
+  marketWatchlists    MarketWatchlist[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+model Farm {
+  id          String   @id @default(uuid())
+  name        String
+  area        Float
+  unit        String   @default("acre")
+  latitude    Float?
+  longitude   Float?
+  soilType    String?
+  address     String?
+  state       String?
+  district    String?
+  village     String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  crops       Crop[]
+  sensors     Sensor[]
+  irrigationZones IrrigationZone[]
+  diseaseReports DiseaseReport[]
+  analytics   FarmAnalytics[]
+  @@index([userId])
+}
+
+model Crop {
+  id                  String    @id @default(uuid())
+  name                String
+  variety             String?
+  sowingDate          DateTime
+  expectedHarvestDate DateTime?
+  actualHarvestDate   DateTime?
+  area                Float
+  status              String    @default("PLANTED")
+  healthScore         Int       @default(100)
+  moisture            Float?
+  growthStage         String?
+  image               String?
+  farmId              String
+  farm                Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+  diseaseReports      DiseaseReport[]
+  sensorReadings      SensorReading[]
+  @@index([farmId])
+  @@index([status])
+}
+
+model WeatherCache {
+  id          String   @id @default(uuid())
+  location    String
+  latitude    Float
+  longitude   Float
+  data        String
+  forecast    String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@unique([latitude, longitude])
+  @@index([expiresAt])
+}
+
+model Sensor {
+  id          String       @id @default(uuid())
+  name        String
+  type        String
+  model       String?
+  firmware    String?
+  batteryLevel Int?
+  isActive    Boolean      @default(true)
+  lastSeenAt  DateTime?
+  farmId      String
+  farm        Farm         @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  readings    SensorReading[]
+  
+  @@index([farmId])
+  @@index([type])
+}
+
+model SensorReading {
+  id          String   @id @default(uuid())
+  sensorId    String
+  sensor      Sensor   @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+  cropId      String?
+  crop        Crop?    @relation(fields: [cropId], references: [id])
+  value       Float
+  unit        String
+  latitude    Float?
+  longitude   Float?
+  timestamp   DateTime @default(now())
+  @@index([sensorId])
+  @@index([timestamp])
+}
+
+model IrrigationZone {
+  id              String   @id @default(uuid())
+  name            String
+  area            Float
+  cropType        String
+  moisture        Float    @default(0)
+  status          String   @default("INACTIVE")
+  sensorId        String?
+
+  farmId          String
+  farm            Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  lastWateredAt   DateTime?
+  nextScheduledAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  schedules       IrrigationSchedule[]
+  @@index([farmId])
+}
+
+model IrrigationSchedule {
+  id          String   @id @default(uuid())
+  zoneId      String
+  zone        IrrigationZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?
+  volume      Float?
+  status      String   @default("PENDING")
+  aiGenerated Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([zoneId])
+}
+
+model DiseaseReport {
+  id              String   @id @default(uuid())
+  diseaseName     String
+  confidence      Float
+  severity        String
+  description     String?
+  treatment       String?
+  prevention      String?
+  imageUrl        String?
+  imageKey        String?
+  cropId          String?
+  crop            Crop?    @relation(fields: [cropId], references: [id])
+  farmId          String?
+  farm            Farm?    @relation(fields: [farmId], references: [id])
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  createdAt       DateTime @default(now())
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Conversation {
+  id          String    @id @default(uuid())
+  title       String?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  messages    Message[]
+  @@index([userId])
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  content         String
+  role            String
+  attachments     String?
+  metadata        String?
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime     @default(now())
+  @@index([conversationId])
+}
+
+model MarketPrice {
+  id          String   @id @default(uuid())
+  commodity   String
+  variety     String?
+  price       Float
+  unit        String   @default("quintal")
+  minPrice    Float?
+  maxPrice    Float?
+  modalPrice  Float?
+  market      String
+  state       String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  @@unique([commodity, market, date])
+  @@index([commodity])
+}
+
+model MarketWatchlist {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commodity String
+  market    String?
+  targetPrice Float?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+model Scheme {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  category    String
+  benefits    String
+  eligibility String
+  deadline    DateTime?
+  status      String   @default("OPEN")
+  applyUrl    String?
+  state       String   @default("All India")
+  crops       String
+  farmerType  String   @default("All")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([category])
+  @@index([state])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  type        String
+  title       String
+  message     String
+  priority    String   @default("MEDIUM")
+  read        Boolean  @default(false)
+  actionUrl   String?
+  metadata    String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@index([read])
+}
+
+model SatelliteData {
+  id          String   @id @default(uuid())
+  farmId      String
+  latitude    Float
+  longitude   Float
+  ndvi        Float?
+  healthIndex Float?
+  vegetation  Float?
+  soilMoisture Float?
+  date        DateTime @default(now())
+  imageUrl    String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  @@index([farmId])
+}
+
+model FarmAnalytics {
+  id              String   @id @default(uuid())
+  farmId          String
+  farm            Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  totalRevenue    Float    @default(0)
+  totalExpenses   Float    @default(0)
+  profit          Float    @default(0)
+  yieldPerAcre    Float    @default(0)
+  waterEfficiency Float    @default(0)
+  fertilizerEfficiency Float @default(0)
+  cropHealthIndex Float    @default(0)
+  period          String
+  startDate       DateTime
+  endDate         DateTime
+  metadata        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@unique([farmId, period, startDate])
+  @@index([userId])
+}
+
+model File {
+  id          String   @id @default(uuid())
+  originalName String
+  mimeType    String
+  size        Int
+  key         String
+  url         String
+  type        String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metadata    String?
+  createdAt   DateTime @default(now())
+  deletedAt   DateTime?
+  @@index([userId])
+}
